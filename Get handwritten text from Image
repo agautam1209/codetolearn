@@ -1,0 +1,62 @@
+import requests
+import time
+import os
+%matplotlib inline
+import matplotlib.pyplot as plt
+from matplotlib.patches import Polygon
+from PIL import Image
+from io import BytesIO
+if 'COMPUTER_VISION_SUBSCRIPTION_KEY' in os.environ:
+    subscription_key = os.environ['COMPUTER_VISION_SUBSCRIPTION_KEY']
+else:
+    print("\nSet the COMPUTER_VISION_SUBSCRIPTION_KEY environment variable.\n**Restart your shell or IDE for changes to take effect.**")
+    sys.exit()
+    if 'COMPUTER_VISION_ENDPOINT' in os.environ:
+    endpoint = os.environ['COMPUTER_VISION_ENDPOINT']
+else:
+    print("\nSet the COMPUTER_VISION_ENDPOINT environment variable.\n**Restart your shell or IDE for changes to take effect.**")
+    text_recognition_url = endpoint + "/v2.1/read/core/asyncBatchAnalyze"
+    #Set image_url to the URL of an image that you want to analyze
+   image_url = "C:/Users/arvendra.gautam/Desktop/Arvendra/PyThon/GetTextFromImage.jpg"
+# Read file
+with open(image_url, 'rb') as f:
+    data = f.read()
+    region = "westcentralus"
+headers = dict()
+headers['Ocp-Apim-Subscription-Key'] = subscription_key
+headers['Content-Type'] = 'application/octet-stream'
+
+# Set request querystring parameters
+params = {'visualFeatures': 'Color,Categories,Tags,Description,ImageType,Faces,Adult'}
+
+# Make request and process response
+response = requests.request('post', text_recognition_url.format(region), data=data, headers=headers, params=params)
+operation_url = response.headers["Operation-Location"]
+analysis = {}
+poll = True
+while (poll):
+    response_final = requests.get(
+        response.headers["Operation-Location"], headers=headers)
+    analysis = response_final.json()
+    print(analysis)
+    time.sleep(1)
+    if ("recognitionResults" in analysis):
+        poll = False
+    if ("status" in analysis and analysis['status'] == 'Failed'):
+        poll = False
+
+polygons = []
+if ("recognitionResults" in analysis):
+    # Extract the recognized text, with bounding boxes.
+    polygons = [(line["boundingBox"], line["text"])
+                for line in analysis["recognitionResults"][0]["lines"]]
+                plt.figure(figsize=(15, 15))
+image = Image.open(BytesIO(data))
+ax = plt.imshow(image)
+for polygon in polygons:
+    vertices = [(polygon[0][i], polygon[0][i+1])
+                for i in range(0, len(polygon[0]), 2)]
+    text = polygon[1]
+    patch = Polygon(vertices, closed=True, fill=False, linewidth=2, color='y')
+    ax.axes.add_patch(patch)
+    plt.text(vertices[0][0], vertices[0][1], text, fontsize=20, va="top")
